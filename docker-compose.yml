@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+
+  django:
+    container_name: django
+    build:
+      context: .
+      dockerfile: ./config/dockerfile
+    entrypoint: ./config/entrypoint.sh
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./config/.env
+    volumes:
+      - ./apps:/app/apps
+      - ./config:/app/config
+    depends_on:
+      - celery
+
+  celery:
+    container_name: celery
+    build:
+      context: .
+      dockerfile: ./config/dockerfile
+    command: celery -A config worker --loglevel=info
+    restart: always
+    env_file:
+      - ./config/.env
+    volumes:
+      - ./apps:/app/apps
+      - ./config:/app/config
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    container_name: postgres
+    image: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    env_file:
+      - ./config/.env
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  redis:
+    container_name: redis
+    image: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
